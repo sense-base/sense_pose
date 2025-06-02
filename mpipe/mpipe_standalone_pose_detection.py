@@ -1,6 +1,5 @@
 import mediapipe as mp
 import cv2
-import numpy as np
 import pyzed.sl as sl
 import time
 
@@ -54,11 +53,7 @@ def standalone_webcam_pose_detection():
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
             # Extract landmarks
-            try:
-                 landmarks = results.pose_landmarks.landmark
-                 #print(landmarks)
-            except:
-                 pass
+            #landmarks = results.pose_landmarks.landmark
 
             # Render detections
             mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
@@ -118,11 +113,7 @@ def standalone_zedcam_pose_detection():
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
                 # Extract landmarks
-                try:
-                    landmarks = results.pose_landmarks.landmark
-                    # print(landmarks) 
-                except:
-                    pass
+                #landmarks = results.pose_landmarks.landmark
 
                 # Render detections
                 mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
@@ -137,5 +128,5 @@ def standalone_zedcam_pose_detection():
 
 
 if __name__ == "__main__":
-     standalone_webcam_pose_detection()
-     #standalone_zedcam_pose_detection()
+    #  standalone_webcam_pose_detection()
+    standalone_zedcam_pose_detection()

@@ -1,6 +1,7 @@
 # sense_pose
 
 This is a respository containing documentation and code for a ROS2 pose estimation package.
+Note - The file `mpipe_standalone_pose_detection.py` is used as a standalone script to test the pose detection model outside the ROS2 package.
 
 ## Setup
 If running the code for the first time on your device, open a command line console and enter the following command to create a configuration file:
@@ -27,15 +28,17 @@ Build the workspace:
 Once that finishes, source the installation files:
 `source install/setup.bash`
 
-Then run the demo (make sure you have a webcam attached to /dev/video0):
+Then run the demo:
 `ros2 launch mpipe mpipe_webcam_launch.py`
+or
+`ros2 launch mpipe mpipe_zedcam_launch.py`
+depending on whether you want to use a webcam or ZED camera
 
 ### View
-Then view the output using `rqt`; in another terminal:
-`source /opt/ros/humble/setup.bash`
+To view the output, open another terminal and run:
 `rqt`
 
-Use the plugins file to visualise Images, there should be a `/ose_skeleton` topic that can visualise the estimated pose.
+Use the plugins file to visualise Images, there should be a `/pose_skeleton` topic that can visualise the estimated pose.
 
 ## Troubleshooting
 ### `/usr/lib64/libEGL_nvidia.so.***.**.**: No such file or directory`

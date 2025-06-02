@@ -3,12 +3,9 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 from cv_bridge import CvBridge
-import time
 import cv2
 
 import mediapipe as mp
-from mediapipe import solutions
-from mediapipe.framework.formats import landmark_pb2
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
@@ -26,7 +23,7 @@ class MediaPipePoseEstimator(Node):
         self.mp_pose = mp.solutions.pose
         self.mp_drawing = mp.solutions.drawing_utils
 
-        self.base_options = python.BaseOptions(model_asset_path="src/mpipe/mediapipe_models/pose_landmarker_full.task", delegate=python.BaseOptions.Delegate.GPU) 
+        self.base_options = python.BaseOptions(model_asset_path="/workspace/sense-base/sense_pose/mediapipe_models/pose_landmarker_full.task", delegate=python.BaseOptions.Delegate.GPU) 
         self.options = vision.PoseLandmarkerOptions(base_options=self.base_options, output_segmentation_masks=True)
         self.detector = vision.PoseLandmarker.create_from_options(self.options)
 
@@ -58,8 +55,6 @@ class MediaPipePoseEstimator(Node):
     def publish_frame(self):
 
         if self.latest_frame:
-        
-            #start_time = time.time()
 
             # Convert image to CV2 
             cv_frame = self.bridge.imgmsg_to_cv2(self.latest_frame)
@@ -69,41 +64,22 @@ class MediaPipePoseEstimator(Node):
             image.flags.writeable = False            
  
             # Make detection
-            mp_frame = mp.Image(image_format=mp.ImageFormat.SRGB, data=image)
-            results1 = self.pose.process(image)
-            results2 = self.detector.detect(mp_frame)
-
-            self._logger.info(str(results1))
-            self._logger.info((str(type(results2))))
-            
+            results = self.pose.process(image)
 
             # Color back to BGR
             image.flags.writeable = True
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
             # Extract landmarks
-            #try:
-            #    landmarks = results.pose_landmarks.landmark
-            #except:
-            #    pass
-
+            #landmarks = results.pose_landmarks.landmark
 
             # Render detections
-            self.mp_drawing.draw_landmarks(image, results1.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
+            self.mp_drawing.draw_landmarks(image, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
 
-            # Calculate the delay
-            """ end_time = time.time()
-            delay = end_time - start_time
-            self.get_logger().info(f'Processing time: {delay:.2f} seconds')
-            """
+
             output_image_msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
             self.publisher.publish(output_image_msg)
-            #self.get_logger().info('Publishing pose estimation image')
 
-            # Calculate the delay
-            #end_time = time.time()
-            #delay = end_time - start_time
-            #self.get_logger().info(f'Processing time: {delay:.2f} seconds')
 
 
 def main(args=None):
