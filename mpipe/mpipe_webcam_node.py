@@ -18,7 +18,7 @@ class WebcamPublisher(Node):
 
         self.image_publisher = self.create_publisher(Image, "/videostream", qos_profile=qos_profile)
 
-        self._cap = cv2.VideoCapture(0)
+        self._cap = cv2.VideoCapture(2)
         self._cvbridge = CvBridge()
 
         self.create_timer(1 / 30.0, self.publish_frame)

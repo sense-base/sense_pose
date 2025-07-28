@@ -7,7 +7,7 @@ import pyzed.sl as sl
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 class ZedcamImagePublisher(Node):
-    # Node that publishes raw webcam images to the 'videostream' topic
+    # Node that publishes raw zed camera images to the 'videostream' topic and the depth information to the 'depthstream' topic
 
     def __init__(self):
         super().__init__('zedcam_image_publisher')
@@ -18,13 +18,17 @@ class ZedcamImagePublisher(Node):
             depth=1
         )
 
-        self.publisher_ = self.create_publisher(Image, 'videostream', qos_profile=qos_profile)
+        self.image_publisher_ = self.create_publisher(Image, 'videostream', qos_profile=qos_profile)
+        self.depth_publisher_ = self.create_publisher(Image, 'depthstream', qos_profile=qos_profile)
 
         self.bridge = CvBridge()
 
         # Initialize ZED camera
         self.zed = sl.Camera()
         init_params = sl.InitParameters()
+        init_params.depth_mode = sl.DEPTH_MODE.PERFORMANCE
+        init_params.coordinate_units = sl.UNIT.METER
+
         status = self.zed.open(init_params)
         if status != sl.ERROR_CODE.SUCCESS:
             self.get_logger().error(f"ZED camera failed to open: {status}")
@@ -33,6 +37,7 @@ class ZedcamImagePublisher(Node):
         # Create runtime parameters and Mat to hold the image
         self.runtime_params = sl.RuntimeParameters()
         self.zed_image = sl.Mat()
+        self.zed_depth = sl.Mat()
 
         self.create_timer(1.0 / 30.0, self.publish_frame)
 
@@ -50,7 +55,16 @@ class ZedcamImagePublisher(Node):
 
             try:
                 img_msg = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
-                self.publisher_.publish(img_msg)
+                self.image_publisher_.publish(img_msg)
+
+                # Retrieve depth map
+                self.zed.retrieve_measure(self.zed_depth, sl.MEASURE.DEPTH)
+                depth_data = self.zed_depth.get_data()
+                # Convert depth (float32, meters) to ROS Image message
+                depth_msg = self.bridge.cv2_to_imgmsg(depth_data, encoding='32FC1')
+                depth_msg.header.stamp = img_msg.header.stamp
+                depth_msg.header.frame_id = 'zed_left_camera'
+                self.depth_publisher_.publish(depth_msg)
 
             except CvBridgeError as error:
                  self.get_logger().error(f"CvBridgeError: {error}")

@@ -23,7 +23,7 @@ class MediaPipePoseEstimator(Node):
         self.mp_pose = mp.solutions.pose
         self.mp_drawing = mp.solutions.drawing_utils
 
-        self.base_options = python.BaseOptions(model_asset_path="/workspace/sense-base/sense_pose/mediapipe_models/pose_landmarker_full.task", delegate=python.BaseOptions.Delegate.GPU) 
+        self.base_options = python.BaseOptions(model_asset_path="/ros2_ws/src/sense_pose/mediapipe_models/pose_landmarker_full.task", delegate=python.BaseOptions.Delegate.GPU) 
         self.options = vision.PoseLandmarkerOptions(base_options=self.base_options, output_segmentation_masks=True)
         self.detector = vision.PoseLandmarker.create_from_options(self.options)
 
