@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import pyzed.sl as sl
@@ -20,6 +20,7 @@ class ZedcamImagePublisher(Node):
 
         self.image_publisher_ = self.create_publisher(Image, 'videostream', qos_profile=qos_profile)
         self.depth_publisher_ = self.create_publisher(Image, 'depthstream', qos_profile=qos_profile)
+        self.camera_info_publisher_ = self.create_publisher(CameraInfo, 'zed_camera_info', qos_profile=qos_profile)
 
         self.bridge = CvBridge()
 
@@ -34,6 +35,18 @@ class ZedcamImagePublisher(Node):
             self.get_logger().error(f"ZED camera failed to open: {status}")
             raise RuntimeError(f"ZED camera error: {status}")
         
+        # Prepare CameraInfo
+        calibration_params = self.zed.get_camera_information().camera_configuration.calibration_parameters.left_cam
+        self.camera_info = CameraInfo()
+        self.camera_info.header.frame_id = 'zed_left_camera'
+        # self.camera_info.width = calibration_params.image_size.width
+        # self.camera_info.height = calibration_params.image_size.height
+        self.camera_info.k = [calibration_params.fx, 0.0, calibration_params.cx,
+                              0.0, calibration_params.fy, calibration_params.cy,
+                              0.0, 0.0, 1.0]
+        # self.camera_info.d = [0.0, 0.0, 0.0, 0.0, 0.0]  # Assume rectified
+        # self.camera_info.p = self.camera_info.k + [0.0, 0.0, 0.0, 0.0]
+
         # Create runtime parameters and Mat to hold the image
         self.runtime_params = sl.RuntimeParameters()
         self.zed_image = sl.Mat()
@@ -55,6 +68,8 @@ class ZedcamImagePublisher(Node):
 
             try:
                 img_msg = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
+                img_msg.header.stamp = self.get_clock().now().to_msg()
+                img_msg.header.frame_id = 'zed_left_camera'
                 self.image_publisher_.publish(img_msg)
 
                 # Retrieve depth map
@@ -65,6 +80,10 @@ class ZedcamImagePublisher(Node):
                 depth_msg.header.stamp = img_msg.header.stamp
                 depth_msg.header.frame_id = 'zed_left_camera'
                 self.depth_publisher_.publish(depth_msg)
+
+                # Publish CameraInfo
+                self.camera_info.header.stamp = img_msg.header.stamp
+                self.camera_info_publisher_.publish(self.camera_info)
 
             except CvBridgeError as error:
                  self.get_logger().error(f"CvBridgeError: {error}")
