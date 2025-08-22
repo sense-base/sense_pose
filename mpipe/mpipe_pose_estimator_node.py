@@ -15,8 +15,43 @@ from message_filters import ApproximateTimeSynchronizer, Subscriber
 class MediaPipePoseEstimator(Node):
     '''
         Node that processes webcam frames to detect key body locations.
-        Subscribes to 'videostream' topic (raw webcam images)
-        Publishes to 'pose_skeleton' topic (webcam images overlaid with detected landmarks/skeleton)
+        Subscribes to 'videostream' topic (raw  zedcam images), 'depthstream' (depth zedcam images)
+        Publishes to 'pose_skeleton' topic (webcam images overlaid with detected landmarks/skeleton),
+        'pose_3d_coordinates' topic (Point3D point cloud with 33 points - see list of landmarks below)
+
+        0 - nose
+        1 - left eye (inner)
+        2 - left eye
+        3 - left eye (outer)
+        4 - right eye (inner)
+        5 - right eye
+        6 - right eye (outer)
+        7 - left ear
+        8 - right ear
+        9 - mouth (left)
+        10 - mouth (right)
+        11 - left shoulder
+        12 - right shoulder
+        13 - left elbow
+        14 - right elbow
+        15 - left wrist
+        16 - right wrist
+        17 - left pinky
+        18 - right pinky
+        19 - left index
+        20 - right index
+        21 - left thumb
+        22 - right thumb
+        23 - left hip
+        24 - right hip
+        25 - left knee
+        26 - right knee
+        27 - left ankle
+        28 - right ankle
+        29 - left heel
+        30 - right heel
+        31 - left foot index
+        32 - right foot index
     '''
 
     def __init__(self):
@@ -92,6 +127,8 @@ class MediaPipePoseEstimator(Node):
         point_cloud_msg = PointCloud()
         point_cloud_msg.header = image_msg.header
         point_cloud_msg.header.frame_id = camera_info_msg.header.frame_id
+        # Initialize 33 points with default values (0.0, 0.0, 0.0)
+        point_cloud_msg.points = [Point32(x=0.0, y=0.0, z=0.0) for _ in range(33)]
         
         if results.pose_landmarks:
             landmarks = results.pose_landmarks.landmark
@@ -107,17 +144,9 @@ class MediaPipePoseEstimator(Node):
                         X = (pixel_x - self.cx) * Z / self.fx
                         Y = (pixel_y - self.cy) * Z / self.fy
                         # Add 3D point to PointCloud
-                        point = Point32()
-                        point.x = X
-                        point.y = Y
-                        point.z = Z
-                        point_cloud_msg.points.append(point)
-                #         if idx == 13:
-                #             self.get_logger().info(f'Left elbow: 3D (X, Y, Z) = ({X:.3f}, {Y:.3f}, {Z:.3f}) m')
-                #     elif idx == 13:
-                #         self.get_logger().warn(f'Left elbow: Invalid depth at ({pixel_x}, {pixel_y})')
-                # elif idx == 13:
-                #     self.get_logger().warn(f'Left elbow:Out of bounds at ({pixel_x}, {pixel_y})')
+                        point_cloud_msg.points[idx].x = X
+                        point_cloud_msg.points[idx].y = Y
+                        point_cloud_msg.points[idx].z = Z
     
         # Publish the PointCloud message
         self.points_publisher.publish(point_cloud_msg)
