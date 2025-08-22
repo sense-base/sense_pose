@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image, CameraInfo
+from sensor_msgs.msg import Image, CameraInfo, PointCloud
+from geometry_msgs.msg import Point32
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
@@ -25,6 +26,13 @@ class MediaPipePoseEstimator(Node):
                                  history=QoSHistoryPolicy.KEEP_LAST,
                                  depth=1
                                  )
+        
+        # QoS profile for point cloud publisher
+        qos_profile_reliable = QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=10  # Increased depth to handle potential bursts of points
+        )
 
         self.image_subscription = Subscriber(self, Image, 'videostream', qos_profile=qos_profile)
         self.depth_subscription = Subscriber(self, Image, 'depthstream', qos_profile=qos_profile)
@@ -33,7 +41,8 @@ class MediaPipePoseEstimator(Node):
             [self.image_subscription, self.depth_subscription, self.camera_info_subsubscription], queue_size=10, slop=0.1)
         self.ts.registerCallback(self.synced_callback)
 
-        self.publisher= self.create_publisher(Image, 'pose_skeleton', qos_profile = qos_profile)
+        self.image_publisher = self.create_publisher(Image, 'pose_skeleton', qos_profile=qos_profile)
+        self.points_publisher = self.create_publisher(PointCloud, 'pose_3d_coordinates', qos_profile=qos_profile_reliable)
         self.bridge = CvBridge()
 
         # Import mediapipe model and drawing utilities
@@ -50,7 +59,6 @@ class MediaPipePoseEstimator(Node):
         self.fy = 0.0
         self.cx = 0.0
         self.cy = 0.0
-
 
     def synced_callback(self, image_msg, depth_msg, camera_info_msg):
         # Update intrinsics
@@ -79,6 +87,11 @@ class MediaPipePoseEstimator(Node):
         # Color back to BGR
         image.flags.writeable = True
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+        # Create PointCloud message for 3D coordinates
+        point_cloud_msg = PointCloud()
+        point_cloud_msg.header = image_msg.header
+        point_cloud_msg.header.frame_id = camera_info_msg.header.frame_id
         
         if results.pose_landmarks:
             landmarks = results.pose_landmarks.landmark
@@ -88,24 +101,33 @@ class MediaPipePoseEstimator(Node):
                 pixel_x = int(x * frame_w)
                 pixel_y = int(y * frame_h)
                 if 0 <= pixel_x < frame_w and 0 <= pixel_y < frame_h:
-                    depth_value = depth_data[pixel_y, pixel_x]
+                    depth_value = float(depth_data[pixel_y, pixel_x])
                     if np.isfinite(depth_value):
                         Z = depth_value
                         X = (pixel_x - self.cx) * Z / self.fx
                         Y = (pixel_y - self.cy) * Z / self.fy
-                        if idx == 13:
-                            self.get_logger().info(f'Left elbow: 3D (X, Y, Z) = ({X:.3f}, {Y:.3f}, {Z:.3f}) m')
-                    elif idx == 13:
-                        self.get_logger().warn(f'Left elbow: Invalid depth at ({pixel_x}, {pixel_y})')
-                elif idx == 13:
-                    self.get_logger().warn(f'Left elbow:Out of bounds at ({pixel_x}, {pixel_y})')
+                        # Add 3D point to PointCloud
+                        point = Point32()
+                        point.x = X
+                        point.y = Y
+                        point.z = Z
+                        point_cloud_msg.points.append(point)
+                #         if idx == 13:
+                #             self.get_logger().info(f'Left elbow: 3D (X, Y, Z) = ({X:.3f}, {Y:.3f}, {Z:.3f}) m')
+                #     elif idx == 13:
+                #         self.get_logger().warn(f'Left elbow: Invalid depth at ({pixel_x}, {pixel_y})')
+                # elif idx == 13:
+                #     self.get_logger().warn(f'Left elbow:Out of bounds at ({pixel_x}, {pixel_y})')
     
+        # Publish the PointCloud message
+        self.points_publisher.publish(point_cloud_msg)
 
+        # Publish the zed camera image with landmarks drawn over it
         self.mp_drawing.draw_landmarks(image, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
         try:
             output_image_msg = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
             output_image_msg.header = image_msg.header
-            self.publisher.publish(output_image_msg)
+            self.image_publisher.publish(output_image_msg)
         except CvBridgeError as e:
             self.get_logger().error(f"CvBridgeError: {e}")
 
