@@ -128,7 +128,7 @@ class MediaPipePoseEstimator(Node):
         point_cloud_msg.header = image_msg.header
         point_cloud_msg.header.frame_id = camera_info_msg.header.frame_id
         # Initialize 33 points with default values (0.0, 0.0, 0.0)
-        point_cloud_msg.points = [Point32(x=0.0, y=0.0, z=0.0) for _ in range(33)]
+        point_cloud_msg.points = [Point32(x=float('nan'), y=float('nan'), z=float('nan')) for _ in range(33)]
         
         if results.pose_landmarks:
             landmarks = results.pose_landmarks.landmark
